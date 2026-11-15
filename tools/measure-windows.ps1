@@ -5,7 +5,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $exePath = (Resolve-Path $Exe).Path
 $stats = Join-Path (Split-Path $exePath) 'idle.json'
-$process = Start-Process -FilePath $exePath -ArgumentList @('--smoke-seconds', '12', '--stats', "`"$stats`"") -PassThru
+$stderr = Join-Path (Split-Path $exePath) 'smoke-stderr.log'
+$stdout = Join-Path (Split-Path $exePath) 'smoke-stdout.log'
+$process = Start-Process -FilePath $exePath -ArgumentList @('--smoke-seconds', '12', '--stats', "`"$stats`"") -RedirectStandardError $stderr -RedirectStandardOutput $stdout -PassThru
 $records = @{}
 $nvimId = $null
 while (-not $process.HasExited) {
@@ -34,5 +36,7 @@ $process.WaitForExit()
 $result = @{ exit_code = $process.ExitCode; processes = $records; note = 'CPU process memory only; excludes GPU allocations. Clean Neovim configuration.' }
 $result | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 $Output
 Get-Content $Output
+if (Test-Path $stderr) { Get-Content $stderr }
+if (Test-Path $stdout) { Get-Content $stdout }
 if (Test-Path $stats) { Get-Content $stats }
 if ($process.ExitCode -ne 0) { throw "imvim exited with code $($process.ExitCode)" }

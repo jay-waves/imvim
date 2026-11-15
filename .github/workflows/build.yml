@@ -50,6 +50,8 @@ jobs:
           path: |
             build/windows/memory.json
             build/windows/idle.json
+            build/windows/smoke-stderr.log
+            build/windows/smoke-stdout.log
       - name: Package
         shell: pwsh
         run: |
