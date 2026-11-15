@@ -91,6 +91,8 @@ xvfb-run -a python3 tools/measure-linux.py --output build/linux/memory.json -- \
 
 内存脚本分别采样 GUI 和 Neovim 的 RSS、PSS、私有内存，单位 KiB；不包含 GPU 分配。Xvfb 下的软件 OpenGL 可能显著增加 GUI RSS，不能把这个数字当成 Windows DX11 占用。Windows 可运行 `powershell -File tools/measure-windows.ps1` 自动采样 GUI 和 Neovim；该脚本仍需 Windows 实机验证。请在同一机器、同一文件与配置下比较 GUI / nvim / LSP 各进程的 Private Bytes 与 Working Set，并单独记录 GPU 内存。
 
+Linux 另有 `xvfb-run -a python3 tests/gui_x11.py build/linux/imvim`，通过 X11 原生按键输入文字、执行 `ZZ` 并验证保存结果。
+
 核心测试覆盖网格滚动、双宽字符、分片 MessagePack、真实 Neovim 输入与中文文件保存、缩放和退出。CI 通过不等于 Windows IME 或硬件图形验收通过。
 
 ## 初次实测

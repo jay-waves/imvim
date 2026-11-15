@@ -91,6 +91,8 @@ jobs:
       - run: cmake --preset linux
       - run: cmake --build --preset linux
       - run: ctest --preset linux
+      - name: Native keyboard roundtrip
+        run: xvfb-run -a python3 tests/gui_x11.py build/linux/imvim
       - name: GUI smoke test
         run: xvfb-run -a build/linux/imvim --smoke-seconds 3 --stats build/linux/smoke.json --screenshot build/linux/smoke.ppm
       - uses: actions/upload-artifact@v4
