@@ -54,12 +54,15 @@ class WinPlatform final : public Platform {
         check(device_->CreateRenderTargetView(buffer.Get(), nullptr, &target_), "DX11 target creation failed");
     }
 public:
-    WinPlatform() {
+    explicit WinPlatform(const Config& config) {
         ImGui_ImplWin32_EnableDpiAwareness();
         WNDCLASSEXW wc{}; wc.cbSize = sizeof(wc); wc.lpfnWndProc = procedure;
         wc.hInstance = GetModuleHandleW(nullptr); wc.hCursor = LoadCursorW(nullptr, IDC_IBEAM); wc.lpszClassName = L"imvim.window";
         if (!RegisterClassExW(&wc)) throw std::runtime_error("RegisterClass failed");
-        window_ = CreateWindowExW(0, wc.lpszClassName, L"imvim", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1000, 700, nullptr, nullptr, wc.hInstance, this);
+        float initial_scale = ImGui_ImplWin32_GetDpiScaleForMonitor(MonitorFromPoint(POINT{0,0}, MONITOR_DEFAULTTOPRIMARY));
+        RECT bounds{0, 0, static_cast<LONG>(config.window_width * initial_scale), static_cast<LONG>(config.window_height * initial_scale)};
+        AdjustWindowRectEx(&bounds, WS_OVERLAPPEDWINDOW, FALSE, 0);
+        window_ = CreateWindowExW(0, wc.lpszClassName, L"imvim", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, bounds.right - bounds.left, bounds.bottom - bounds.top, nullptr, nullptr, wc.hInstance, this);
         if (!window_) throw std::runtime_error("CreateWindow failed");
         scale_ = ImGui_ImplWin32_GetDpiScaleForHwnd(window_);
         wake_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
@@ -72,7 +75,7 @@ public:
         if (FAILED(result)) result = create(D3D_DRIVER_TYPE_WARP);
         check(result, "Cannot initialize Direct3D 11"); target();
         ImGui::CreateContext(); ImGui_ImplWin32_Init(window_); ImGui_ImplDX11_Init(device_.Get(), context_.Get());
-        ShowWindow(window_, SW_SHOWDEFAULT); UpdateWindow(window_);
+        ShowWindow(window_, config.maximized ? SW_MAXIMIZE : SW_SHOWNORMAL); UpdateWindow(window_);
     }
     ~WinPlatform() override {
         ImGui_ImplDX11_Shutdown(); ImGui_ImplWin32_Shutdown(); ImGui::DestroyContext();
@@ -134,6 +137,6 @@ public:
     void screenshot(const std::string&) override { throw std::runtime_error("--screenshot is available only on the Linux validation backend"); }
 };
 }
-std::unique_ptr<Platform> make_platform() { return std::make_unique<WinPlatform>(); }
+std::unique_ptr<Platform> make_platform(const Config& config) { return std::make_unique<WinPlatform>(config); }
 void show_error(const std::string& text) { MessageBoxW(nullptr, wide(text).c_str(), L"imvim", MB_OK | MB_ICONERROR); }
 }

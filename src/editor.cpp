@@ -1,4 +1,5 @@
 #include "editor.hpp"
+#include "font_lookup.hpp"
 #include <imgui_internal.h>
 #include <algorithm>
 #include <cmath>
@@ -25,20 +26,27 @@ std::string default_font() {
     return {};
 }
 }
-Editor::Editor(Session& session, Platform& platform, const std::string& path, const std::string& fallback, float size, float line_spacing, float letter_spacing)
-    : session_(session), platform_(platform), font_size_(size), line_spacing_(line_spacing), letter_spacing_(letter_spacing) {
+Editor::Editor(Session& session, Platform& platform, const Config& settings)
+    : session_(session), platform_(platform), font_size_(settings.font_size), line_spacing_(settings.line_spacing), letter_spacing_(settings.letter_spacing), cjk_scale_(settings.cjk_scale) {
+    float size = font_size_;
+    const auto& path = settings.font;
+    const auto& fallback = settings.fallback_font;
     auto& io = ImGui::GetIO(); io.IniFilename = nullptr; io.LogFilename = nullptr;
-    auto chosen = path.empty() ? default_font() : path;
+    FontFace face;
+    if (!settings.font_family.empty()) face = find_system_font(settings.font_family);
+    auto family_bytes = face.file.u8string();
+    auto chosen = !settings.font_family.empty() ? std::string(family_bytes.begin(), family_bytes.end()) : path.empty() ? default_font() : path;
     if (!chosen.empty()) {
         if (!std::filesystem::exists(std::filesystem::path(std::u8string(chosen.begin(), chosen.end())))) throw std::runtime_error("Font file not found: " + chosen);
-        font_ = io.Fonts->AddFontFromFileTTF(chosen.c_str(), size);
+        ImFontConfig config; config.FontNo = face.index;
+        font_ = io.Fonts->AddFontFromFileTTF(chosen.c_str(), size, &config);
     } else font_ = io.Fonts->AddFontDefault();
     if (!font_) throw std::runtime_error("Could not load font");
-    auto merge = [&](const std::filesystem::path& file, bool icons = false) {
+    auto merge = [&](const std::filesystem::path& file, bool icons = false, int index = 0) {
         if (!std::filesystem::exists(file))
             throw std::runtime_error("Missing fallback font. Keep the fonts directory beside imvim: " + file.string());
         auto bytes = file.u8string(); std::string filename(bytes.begin(), bytes.end());
-        ImFontConfig config; config.MergeMode = true;
+        ImFontConfig config; config.MergeMode = true; config.FontNo = index;
         if (icons) {
             // Symbols Only uses a square em. Fit it to the half-em terminal cell.
             config.ExtraSizeScale = 0.5f;
@@ -47,6 +55,10 @@ Editor::Editor(Session& session, Platform& platform, const std::string& path, co
         if (!io.Fonts->AddFontFromFileTTF(filename.c_str(), size, &config))
             throw std::runtime_error("Could not load fallback font: " + filename);
     };
+    for (const auto& family : settings.fallback_families) {
+        auto resolved = find_system_font(family);
+        merge(resolved.file, false, resolved.index);
+    }
     // Resolve symbols before CJK: some CJK fonts contain unrelated private-use glyphs.
     merge(platform_.base_path() / "fonts" / "SymbolsNerdFontMono-Regular.ttf", true);
     merge(fallback.empty() ? platform_.base_path() / "fonts" / "DroidSansFallbackFull.ttf"
@@ -60,6 +72,10 @@ Editor::Editor(Session& session, Platform& platform, const std::string& path, co
         auto symbols = std::filesystem::path(windows_dir) / "Fonts" / "seguisym.ttf";
         if (std::filesystem::exists(symbols)) merge(symbols);
     }
+#endif
+#ifndef _WIN32
+    auto symbols = find_system_font("sans-serif:charset=2713");
+    merge(symbols.file, false, symbols.index);
 #endif
     io.FontDefault = font_;
 }
@@ -149,7 +165,7 @@ void Editor::draw_text(int row, int col, ImU32 foreground) {
         auto* glyph = font_->GetFontBaked(size)->FindGlyph(codepoint);
         if (glyph && glyph->AdvanceX > 0) {
             float target = 2 * font_->GetFontBaked(size)->GetCharAdvance('M');
-            float factor = std::clamp(target / glyph->AdvanceX, 0.75f, 1.5f);
+            float factor = std::clamp(target / glyph->AdvanceX, 0.75f, 1.5f) * cjk_scale_;
             float ink_height = glyph->Y1 - glyph->Y0;
             if (ink_height > 0) factor = std::min(factor, (cell_height_ - 1) / ink_height);
             size *= factor;

@@ -16,7 +16,7 @@ class SdlPlatform final : public Platform {
     Uint32 wake_event_ = 0;
     bool close_ = false;
 public:
-    SdlPlatform() {
+    explicit SdlPlatform(const Config& config) {
         if (!SDL_Init(SDL_INIT_VIDEO)) throw std::runtime_error(SDL_GetError());
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
@@ -24,7 +24,7 @@ public:
         SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
-        window_ = SDL_CreateWindow("imvim", 1000, 700, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+        window_ = SDL_CreateWindow("imvim", config.window_width, config.window_height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
         if (!window_) { SDL_Quit(); throw std::runtime_error(SDL_GetError()); }
         context_ = SDL_GL_CreateContext(window_);
         if (!context_) { SDL_DestroyWindow(window_); SDL_Quit(); throw std::runtime_error(SDL_GetError()); }
@@ -32,6 +32,7 @@ public:
         ImGui::CreateContext();
         ImGui_ImplSDL3_InitForOpenGL(window_, context_); ImGui_ImplOpenGL3_Init("#version 330 core");
         wake_event_ = SDL_RegisterEvents(1);
+        if (config.maximized) SDL_MaximizeWindow(window_);
         SDL_StartTextInput(window_);
     }
     ~SdlPlatform() override {
@@ -89,6 +90,6 @@ public:
     }
 };
 }
-std::unique_ptr<Platform> make_platform() { return std::make_unique<SdlPlatform>(); }
+std::unique_ptr<Platform> make_platform(const Config& config) { return std::make_unique<SdlPlatform>(config); }
 void show_error(const std::string& message) { std::cerr << "imvim: " << message << '\n'; }
 }

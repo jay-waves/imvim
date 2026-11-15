@@ -21,7 +21,7 @@ Fedora 系统开发依赖（需要显式安装 X11 / Wayland 扩展头文件，�
 
 ```sh
 sudo dnf install gcc-c++ cmake ninja-build git curl zip unzip tar pkgconf-pkg-config \
-  SDL3-devel mesa-libGL-devel autoconf autoconf-archive automake libtool xorg-x11-server-Xvfb \
+  SDL3-devel mesa-libGL-devel autoconf autoconf-archive automake libtool fontconfig xorg-x11-server-Xvfb \
   libXext-devel libXcursor-devel libXi-devel libXrandr-devel libXfixes-devel \
   libXScrnSaver-devel libXtst-devel wayland-devel libxkbcommon-devel libdecor-devel ibus-devel
 export VCPKG_ROOT="$HOME/.local/share/vcpkg"
@@ -64,27 +64,54 @@ imvim --fallback-font /path/to/cjk.ttf      # 可选：覆盖内置中文回退�
 - 关闭窗口向 Neovim 发出 `confirm qall`，有修改时在编辑区确认。`:q` / `:qa` 正常退出。
 - Windows 使用 Unicode 命令行，支持含空格和中文的路径。
 
-## 字体配置
+## 配置
 
-读取 `~/.config/imvim/config.json`；Windows 对应 `%USERPROFILE%\.config\imvim\config.json`。文件不存在时使用默认值，不自动写入用户配置。修改后重启生效。
+读取 `~/.config/imvim/config.json`；Windows 对应 `%USERPROFILE%\.config\imvim\config.json`。修改后重启生效。文件缺省时使用默认值，不自动写入用户配置。也可用 `--config FILE` 指定另一份配置。
+
+Windows 示例（发布包附带 `config.example.json`，复制到上述目录并改名即可）：
 
 ```json
 {
   "font": {
-    "file": "C:/Windows/Fonts/consola.ttf",
-    "fallback_file": "",
+    "family": "Consolas",
+    "fallback_families": ["Segoe UI Symbol"],
     "size": 16,
+    "cjk_scale": 1.0,
     "line_spacing": 0,
     "letter_spacing": 0
+  },
+  "window": {
+    "width": 1100,
+    "height": 750,
+    "maximized": false
+  },
+  "nvim": {
+    "path": "nvim",
+    "args": []
   }
 }
 ```
 
-`file` 为空或省略时自动选择系统等宽字体；可直接指定已安装的系统字体文件。`fallback_file` 为空或省略时使用内置中文回退，Nerd Font 与 Windows 系统符号回退继续保留。当前支持字体文件路径，尚不支持字体族名。
+| 字段 | 默认值 / 说明 |
+| --- | --- |
+| `font.family` | 空，自动选择等宽字体。Windows 用 DirectWrite，Linux 用 PATH 中的 `fc-match` 查询。Windows 找不到字体会报错；Linux 使用 Fontconfig 的匹配和替代规则。 |
+| `font.file` | 空，也可按路径选择字体；与非空 `family` 互斥。 |
+| `font.fallback_families` | `[]`，按顺序查询缺字；后面继续使用内置 Nerd Font、中文字体和系统符号兜底。字体集合保留所选 face 索引。 |
+| `font.fallback_file` | 空，内置中文回退；非空则替换内置中文字体。 |
+| `font.size` | `16`，范围 8–72。 |
+| `font.cjk_scale` | `1.0`，范围 0.5–2；在自动两列匹配基础上微调双宽字形，过大时限制在行高内。 |
+| `font.line_spacing` | `0`，额外行距，范围 -2–32。 |
+| `font.letter_spacing` | `0`，额外列距，范围 -2–16；负值可能裁切字形。 |
+| `window.width` / `height` | `1000` / `700`，初始客户区逻辑像素；范围分别 320–8192 / 200–8192。Windows 按初始 DPI 缩放。 |
+| `window.maximized` | `false`，启动时最大化。 |
+| `nvim.path` | `"nvim"`，裸命令名走 PATH；也可填写完整路径。 |
+| `nvim.args` | `[]`，参数数组，保留空格，无 shell 展开；排在命令行传给 Neovim 的参数之前。不要指定 `--embed`、`--headless`、`--listen` 或 `--` 等传输选项。 |
 
-字号范围 8–72；行距和字距为默认网格尺寸上额外增加的逻辑像素，范围分别为 -2–32 与 -2–16。Windows 会按 DPI 缩放。负字距可能裁切字形，建议先使用 0。
+Linux 可将 `family` 改为 `"monospace"`，将 `fallback_families` 留空或使用已安装字体名。系统字体查询不等于系统文字渲染：正文仍由 ImGui 绘制，尚未接入 DirectWrite 排版。
 
-路径支持 `~/`，相对路径以配置文件目录为基准。JSON 中 Windows 路径建议使用 `/`。所有字段可省略；错误类型、拼写错误与非法 JSON 会报告配置路径和原因。命令行 `--font`、`--fallback-font`、`--font-size` 覆盖相应配置。
+优先级：默认值 → JSON → 命令行。`--font FILE` / `--font-family NAME` 互相覆盖，后者生效；`--fallback-font`、`--font-size`、`--nvim` 覆盖对应配置。字体与 Neovim 路径支持 `~/`，相对路径以配置文件目录为基准；`nvim.path` 中不含路径分隔符的命令名保持 PATH 查找。Windows JSON 路径建议使用 `/`。所有字段可省略；未知字段、错误类型和非法范围会报告配置路径及原因。
+
+窗口位置和尺寸暂不自动保存。`--smoke-seconds` 使用配置中的字体和窗口设置，但强制以 `--clean -n` 启动 Neovim，以便测量结果可比较。
 
 ## 当前边界
 
@@ -95,7 +122,7 @@ imvim --fallback-font /path/to/cjk.ttf      # 可选：覆盖内置中文回退�
 - 暂无连字、复杂文字 shaping、彩色 emoji、独立粗体/斜体字形；undercurl 暂画成直下划线。
 - Windows 使用系统 IME 的基础提交及候选框定位接口；真实中文输入法、跨屏 DPI 和显卡行为需要 Windows 实机验证。Linux 暂未绘制组合输入的预编辑文本。
 - Alt/AltGr、非美式键盘组合、平台快捷键仍需完善。
-- `guifont` 变化不会动态更新 GUI 字体；请使用命令行字体选项。
+- `guifont` 变化不会动态更新 GUI 字体；请使用 JSON 或命令行字体选项。
 - 没有外置补全菜单、外置命令行、multigrid、动画或自定义标题栏。
 - GUI 不能降低 Neovim 插件和语言服务器本身的占用。
 - Windows 子进程 stderr 暂定向到 NUL，GUI 显示 RPC / 启动错误；更完整的诊断日志待补。

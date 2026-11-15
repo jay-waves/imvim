@@ -25,26 +25,40 @@ int main(int argc, char** argv) {
 #else
         for (int i = 1; i < argc; ++i) arguments.emplace_back(argv[i]);
 #endif
-        auto config = load_config(default_config_path());
-        std::string nvim = "nvim", font = config.font, fallback = config.fallback_font, screenshot, stats;
+        auto config_path = default_config_path();
+        for (std::size_t i = 0; i < arguments.size(); ++i) {
+            if (arguments[i] == "--") break;
+            if (arguments[i] == "--smoke-seconds") automated = true;
+            if (arguments[i] == "--config") {
+                if (++i >= arguments.size()) throw std::runtime_error("Missing value for --config");
+                const auto& value = arguments[i];
+                config_path = std::filesystem::path(std::u8string(value.begin(), value.end()));
+                if (!std::filesystem::exists(config_path)) throw std::runtime_error("Explicit configuration file does not exist: " + value);
+            } else if (arguments[i] == "--font" || arguments[i] == "--font-family" || arguments[i] == "--font-size" || arguments[i] == "--fallback-font" || arguments[i] == "--nvim" || arguments[i] == "--stats" || arguments[i] == "--screenshot") ++i;
+        }
+        auto config = load_config(config_path);
+        std::string nvim = config.nvim_path, font = config.font, fallback = config.fallback_font, screenshot, stats;
         float font_size = config.font_size; int smoke_seconds = 0;
         std::vector<std::string> nvim_args{"--embed"};
+        nvim_args.insert(nvim_args.end(), config.nvim_args.begin(), config.nvim_args.end());
         bool pass = false;
         for (std::size_t i = 0; i < arguments.size(); ++i) {
             const auto& arg = arguments[i];
             auto value = [&]() { if (++i >= arguments.size()) throw std::runtime_error("Missing value for " + arg); return arguments[i]; };
             if (pass) { nvim_args.push_back(arg); continue; }
             if (arg == "--") { pass = true; continue; }
-            if (arg == "--nvim") nvim = value();
-            else if (arg == "--font") font = value();
+            if (arg == "--config") { (void)value(); }
+            else if (arg == "--nvim") nvim = value();
+            else if (arg == "--font") { font = value(); config.font_family.clear(); }
+            else if (arg == "--font-family") { config.font_family = value(); font.clear(); }
             else if (arg == "--fallback-font") fallback = value();
             else if (arg == "--font-size") font_size = std::stof(value());
             else if (arg == "--smoke-seconds") { automated = true; smoke_seconds = std::stoi(value()); }
             else if (arg == "--screenshot") screenshot = value();
             else if (arg == "--stats") stats = value();
             else if (arg == "--help") {
-                const std::string help = "imvim [--nvim PATH] [--font FILE] [--fallback-font FILE] [--font-size 16]\n"
-                    "      [--stats FILE] [--smoke-seconds N] [--screenshot FILE.ppm]\n"
+                const std::string help = "imvim [--nvim PATH] [--font FILE | --font-family NAME] [--fallback-font FILE] [--font-size 16]\n"
+                    "      [--config FILE] [--stats FILE] [--smoke-seconds N] [--screenshot FILE.ppm]\n"
                     "      [--clean] [-- Neovim arguments / files]\n"
                     "Ctrl+Shift+V: paste clipboard. Window close: Neovim save confirmation.\n"
                     "Smoke mode uses --clean and exits automatically. No terminal emulator is used.\n";
@@ -59,9 +73,10 @@ int main(int argc, char** argv) {
         if (!(font_size >= 8 && font_size <= 72)) throw std::runtime_error("Font size must be 8..72");
         if (smoke_seconds < 0 || smoke_seconds > 300) throw std::runtime_error("Smoke duration must be 0..300 seconds");
         if (smoke_seconds) nvim_args = {"--embed", "--clean", "-n"};
-        auto platform = make_platform();
+        config.font = font; config.fallback_font = fallback; config.font_size = font_size;
+        auto platform = make_platform(config);
         Session session(nvim, nvim_args, [&] { platform->wake(); });
-        Editor editor(session, *platform, font, fallback, font_size, config.line_spacing, config.letter_spacing);
+        Editor editor(session, *platform, config);
         bool first = true, smoke_content = false;
         auto started = std::chrono::steady_clock::now();
         while (session.alive()) {

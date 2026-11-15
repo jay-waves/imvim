@@ -1,0 +1,19 @@
+{
+  "font": {
+    "family": "Consolas",
+    "fallback_families": ["Segoe UI Symbol"],
+    "size": 16,
+    "cjk_scale": 1.0,
+    "line_spacing": 0,
+    "letter_spacing": 0
+  },
+  "window": {
+    "width": 1100,
+    "height": 750,
+    "maximized": false
+  },
+  "nvim": {
+    "path": "nvim",
+    "args": []
+  }
+}

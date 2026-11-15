@@ -48,20 +48,66 @@ Config load_config(const std::filesystem::path& path) {
         if (!stream) throw std::runtime_error("Cannot open configuration");
         auto json = nlohmann::json::parse(stream);
         if (!json.is_object()) throw std::runtime_error("Configuration must be an object");
-        for (const auto& entry : json.items()) if (entry.key() != "font") throw std::runtime_error("Unknown setting: " + entry.key());
-        if (!json.contains("font")) return config;
-        const auto& font = json.at("font");
-        if (!font.is_object()) throw std::runtime_error("font must be an object");
-        for (const auto& entry : font.items()) {
-            auto key = entry.key();
-            if (key != "file" && key != "fallback_file" && key != "size" && key != "line_spacing" && key != "letter_spacing")
-                throw std::runtime_error("Unknown font setting: " + key);
+        auto keys = [](const nlohmann::json& object, std::initializer_list<const char*> allowed, const char* section) {
+            if (!object.is_object()) throw std::runtime_error(std::string(section) + " must be an object");
+            for (const auto& entry : object.items()) {
+                bool known = false;
+                for (auto key : allowed) known |= entry.key() == key;
+                if (!known) throw std::runtime_error(std::string("Unknown ") + section + " setting: " + entry.key());
+            }
+        };
+        auto strings = [](const nlohmann::json& values) {
+            if (!values.is_array()) throw std::runtime_error("Expected an array of strings");
+            if (values.size() > 64) throw std::runtime_error("Too many array entries (maximum 64)");
+            std::vector<std::string> result;
+            for (const auto& value : values) result.push_back(value.get<std::string>());
+            return result;
+        };
+        keys(json, {"font", "window", "nvim"}, "root");
+        if (json.contains("font")) {
+            const auto& font = json.at("font");
+            keys(font, {"file", "family", "fallback_file", "fallback_families", "size", "line_spacing", "letter_spacing", "cjk_scale"}, "font");
+            if (font.contains("file")) config.font = font_path(font.at("file"), path.parent_path());
+            if (font.contains("family")) config.font_family = font.at("family").get<std::string>();
+            if (!config.font.empty() && !config.font_family.empty()) throw std::runtime_error("Choose font.file or font.family, not both");
+            if (font.contains("fallback_file")) config.fallback_font = font_path(font.at("fallback_file"), path.parent_path());
+            if (font.contains("fallback_families")) {
+                config.fallback_families = strings(font.at("fallback_families"));
+                for (auto& name : config.fallback_families) if (name.empty()) throw std::runtime_error("Fallback family cannot be empty");
+            }
+            number(font, "size", config.font_size, 8, 72);
+            number(font, "line_spacing", config.line_spacing, -2, 32);
+            number(font, "letter_spacing", config.letter_spacing, -2, 16);
+            number(font, "cjk_scale", config.cjk_scale, 0.5f, 2);
         }
-        if (font.contains("file")) config.font = font_path(font.at("file"), path.parent_path());
-        if (font.contains("fallback_file")) config.fallback_font = font_path(font.at("fallback_file"), path.parent_path());
-        number(font, "size", config.font_size, 8, 72);
-        number(font, "line_spacing", config.line_spacing, -2, 32);
-        number(font, "letter_spacing", config.letter_spacing, -2, 16);
+        if (json.contains("window")) {
+            const auto& window = json.at("window");
+            keys(window, {"width", "height", "maximized"}, "window");
+            auto dimension = [&](const char* key, int& destination, int low) {
+                if (!window.contains(key)) return;
+                if (!window.at(key).is_number_integer()) throw std::runtime_error(std::string(key) + " must be an integer");
+                auto value = window.at(key).get<long long>();
+                if (value < low || value > 8192) throw std::runtime_error(std::string(key) + " outside supported range");
+                destination = static_cast<int>(value);
+            };
+            dimension("width", config.window_width, 320);
+            dimension("height", config.window_height, 200);
+            if (window.contains("maximized")) config.maximized = window.at("maximized").get<bool>();
+        }
+        if (json.contains("nvim")) {
+            const auto& nvim = json.at("nvim");
+            keys(nvim, {"path", "args"}, "nvim");
+            if (nvim.contains("path")) {
+                auto executable = nvim.at("path").get<std::string>();
+                if (executable.empty()) throw std::runtime_error("nvim.path cannot be empty");
+                // Bare executable names use PATH. Paths are relative to the configuration.
+                config.nvim_path = executable.find_first_of("/\\") == std::string::npos ? executable : font_path(nvim.at("path"),path.parent_path());
+            }
+            if (nvim.contains("args")) config.nvim_args = strings(nvim.at("args"));
+            for (const auto& arg : config.nvim_args)
+                if (arg == "--headless" || arg == "--embed" || arg == "--listen" || arg == "--")
+                    throw std::runtime_error("nvim.args contains a reserved UI transport option: " + arg);
+        }
         return config;
     } catch (const std::exception& e) {
         auto u8 = path.u8string();

@@ -1,5 +1,6 @@
 #include "grid.hpp"
 #include "config.hpp"
+#include "font_lookup.hpp"
 #include "session.hpp"
 #include <chrono>
 #include <filesystem>
@@ -25,7 +26,18 @@ void config_test() {
     require(config.font_size == 14.5f && config.line_spacing == 2 && config.letter_spacing == -0.5f, "Numeric config settings");
     auto expected = (directory / "fonts" / "mono.ttf").u8string();
     require(config.font == std::string(expected.begin(),expected.end()), "Font paths resolve relative to config");
-    for (const auto* invalid : {"{", "[]", R"({"font":{"size":0}})", R"({"font":{"size":"16"}})", R"({"font":{"szie":16}})", R"({"font":{"file":12}})"}) {
+    write(R"({"font":{"family":"Consolas","fallback_families":["Segoe UI Symbol"],"cjk_scale":1.15},"window":{"width":1280,"height":800,"maximized":true},"nvim":{"path":"nvim","args":["--clean","-n"]}})");
+    config = imvim::load_config(path);
+    require(config.font_family == "Consolas" && config.fallback_families.size() == 1 && config.cjk_scale > 1.14f, "System family and CJK scale");
+    require(config.window_width == 1280 && config.window_height == 800 && config.maximized, "Window settings");
+    require(config.nvim_path == "nvim" && config.nvim_args == std::vector<std::string>({"--clean","-n"}), "Neovim settings");
+#ifdef _WIN32
+    auto face = imvim::find_system_font("Consolas");
+#else
+    auto face = imvim::find_system_font("monospace");
+#endif
+    require(std::filesystem::exists(face.file) && face.index >= 0, "Resolve installed system font");
+    for (const auto* invalid : {"{", "[]", R"({"font":{"size":0}})", R"({"font":{"size":"16"}})", R"({"font":{"szie":16}})", R"({"font":{"file":12}})", R"({"font":{"family":"Consolas","file":"font.ttf"}})", R"({"font":{"cjk_scale":0}})", R"({"window":{"width":1}})", R"({"window":{"height":500.5}})", R"({"window":{"maximized":1}})", R"({"nvim":{"args":"--clean"}})", R"({"nvim":{"args":["--headless"]}})", R"({"nvim":{"path":""}})"}) {
         write(invalid); bool rejected = false;
         try { imvim::load_config(path); } catch (const std::exception& e) { rejected = std::string(e.what()).find("config.json") != std::string::npos; }
         require(rejected, "Invalid config includes file path in error");

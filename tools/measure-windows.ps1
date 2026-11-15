@@ -1,4 +1,5 @@
 param(
+    [string]$Config = "",
     [string]$Exe = "$PSScriptRoot/../build/windows/imvim.exe",
     [string]$Output = "$PSScriptRoot/../build/windows/memory.json"
 )
@@ -7,7 +8,9 @@ $exePath = (Resolve-Path $Exe).Path
 $stats = Join-Path (Split-Path $exePath) 'idle.json'
 $stderr = Join-Path (Split-Path $exePath) 'smoke-stderr.log'
 $stdout = Join-Path (Split-Path $exePath) 'smoke-stdout.log'
-$process = Start-Process -FilePath $exePath -ArgumentList @('--smoke-seconds', '12', '--stats', "`"$stats`"") -RedirectStandardError $stderr -RedirectStandardOutput $stdout -PassThru
+$arguments = @('--smoke-seconds', '12', '--stats', "`"$stats`"")
+if ($Config) { $arguments += @('--config', "`"$((Resolve-Path $Config).Path)`"") }
+$process = Start-Process -FilePath $exePath -ArgumentList $arguments -RedirectStandardError $stderr -RedirectStandardOutput $stdout -PassThru
 $records = @{}
 $nvimId = $null
 while (-not $process.HasExited) {

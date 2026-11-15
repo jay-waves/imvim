@@ -1,4 +1,5 @@
 #pragma once
+#include "config.hpp"
 #include <memory>
 #include <filesystem>
 #include <string>
@@ -19,6 +20,6 @@ public:
     virtual std::filesystem::path base_path() const = 0;
     virtual void screenshot(const std::string& path) = 0;
 };
-std::unique_ptr<Platform> make_platform();
+std::unique_ptr<Platform> make_platform(const Config& config);
 void show_error(const std::string& message);
 }

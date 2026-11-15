@@ -6,7 +6,7 @@
 namespace imvim {
 class Editor {
 public:
-    Editor(Session& session, Platform& platform, const std::string& font, const std::string& fallback, float size, float line_spacing = 0, float letter_spacing = 0);
+    Editor(Session& session, Platform& platform, const Config& config);
     bool receive();
     void frame();
     std::size_t frames = 0;
@@ -18,7 +18,7 @@ private:
     Grid pending_, display_;
     ImFont* font_ = nullptr;
     float font_size_ = 16, cell_width_ = 10, cell_height_ = 22;
-    float line_spacing_ = 0, letter_spacing_ = 0;
+    float line_spacing_ = 0, letter_spacing_ = 0, cjk_scale_ = 1;
     int columns_ = 0, rows_ = 0;
     void input();
     void draw();
