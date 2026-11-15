@@ -116,6 +116,14 @@ public:
         ImmSetCandidateWindow(imc, &candidate); ImmReleaseContext(window_, imc);
     }
     float scale() const override { return scale_; }
+    std::string renderer() const override {
+        ComPtr<IDXGIDevice> dxgi; ComPtr<IDXGIAdapter> adapter; DXGI_ADAPTER_DESC desc{};
+        if (FAILED(device_.As(&dxgi)) || FAILED(dxgi->GetAdapter(&adapter)) || FAILED(adapter->GetDesc(&desc))) return "Direct3D 11";
+        int n = WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, nullptr, 0, nullptr, nullptr);
+        std::string text(n, 0); WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, text.data(), n, nullptr, nullptr);
+        if (!text.empty()) text.pop_back();
+        return "Direct3D 11 / " + text;
+    }
     void screenshot(const std::string&) override { throw std::runtime_error("--screenshot is available only on the Linux validation backend"); }
 };
 }

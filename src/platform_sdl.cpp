@@ -67,6 +67,10 @@ public:
         SDL_SetTextInputArea(window_, &area, 0);
     }
     float scale() const override { return 1.0f; } // SDL/ImGui use logical coordinates; framebuffer scale handles pixels.
+    std::string renderer() const override {
+        const auto* name = glGetString(GL_RENDERER);
+        return name ? reinterpret_cast<const char*>(name) : "OpenGL (unknown renderer)";
+    }
     void screenshot(const std::string& path) override {
         int w, h; SDL_GetWindowSizeInPixels(window_, &w, &h);
         std::vector<unsigned char> pixels(static_cast<std::size_t>(w) * h * 3);

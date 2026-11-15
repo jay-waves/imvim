@@ -3,6 +3,7 @@
 #include <chrono>
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 #ifdef _WIN32
 #include <shellapi.h>
 #endif
@@ -85,7 +86,7 @@ int main(int argc, char** argv) {
         }
         if (!stats.empty()) {
             std::ofstream out(stats);
-            out << "{\"frames\":" << editor.frames << ",\"seconds\":" << std::chrono::duration<double>(std::chrono::steady_clock::now()-started).count() << ",\"grid_ready\":" << (editor.ready()?"true":"false") << "}\n";
+            out << "{\"frames\":" << editor.frames << ",\"seconds\":" << std::chrono::duration<double>(std::chrono::steady_clock::now()-started).count() << ",\"grid_ready\":" << (editor.ready()?"true":"false") << ",\"renderer\":" << std::quoted(platform->renderer()) << "}\n";
             if (!out) throw std::runtime_error("Cannot write statistics");
         }
         if (!editor.ready()) throw std::runtime_error("Neovim exited before UI initialization");

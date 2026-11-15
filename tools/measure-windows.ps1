@@ -34,4 +34,5 @@ $process.WaitForExit()
 $result = @{ exit_code = $process.ExitCode; processes = $records; note = 'CPU process memory only; excludes GPU allocations. Clean Neovim configuration.' }
 $result | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 $Output
 Get-Content $Output
+if (Test-Path $stats) { Get-Content $stats }
 if ($process.ExitCode -ne 0) { throw "imvim exited with code $($process.ExitCode)" }
