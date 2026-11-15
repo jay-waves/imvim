@@ -45,7 +45,7 @@ ctest --preset windows
 .\build\windows\imvim.exe --clean
 ```
 
-`windows` preset 使用 `x64-windows-static` 和静态 MSVC CRT。Neovim 单独安装并加入 PATH，或使用 `--nvim C:\path\to\nvim.exe`。发布包不包含 Neovim 或字体。
+`windows` preset 使用 `x64-windows-static` 和静态 MSVC CRT。Neovim 单独安装并加入 PATH，或使用 `--nvim C:\path\to\nvim.exe`。发布包不包含 Neovim；包含中文与 Nerd Font 回退字体。解压时请保留 `fonts/` 目录和许可证文件，不能只复制 exe。
 
 `.github/workflows/build.yml` 在 Windows runner 原生编译、运行真实 Neovim 集成测试，并上传 `imvim-windows-x64.zip`。Linux job 另外运行 Xvfb 图形冒烟测试。推送到 `git@github.com:jay-waves/imvim.git` 后触发。
 
@@ -54,8 +54,8 @@ ctest --preset windows
 ```sh
 imvim --clean                              # 隔离插件开销
 imvim -- README.md                         # 加载正常 Neovim 配置
-imvim --font /path/to/mono.ttf --font-size 18
-imvim --fallback-font /path/to/cjk.ttf      # 缺字时查询这份字体；也支持常规 TTC
+imvim --font /path/to/mono.ttf --font-size 16
+imvim --fallback-font /path/to/cjk.ttf      # 可选：覆盖内置中文回退字体；支持常规 TTC
 ```
 
 - 编辑、分屏、命令、插件仍由 Neovim 负责。
@@ -68,7 +68,8 @@ imvim --fallback-font /path/to/cjk.ttf      # 缺字时查询这份字体；也�
 
 这是用于验证功能与内存的原型，不是成熟 GUI：
 
-- 默认只自动寻找基础等宽字体；中文需要指定包含中文字形的主字体或 `--fallback-font`。不做系统字体自动回退。
+- 默认使用系统等宽主字体，自动合并随包提供的 Droid 中文回退与 Nerd Font Mono 图标。默认字号 16，网格使用实际字形 advance，不逐格向上取整。
+- 两份回退字体合计约 6.4 MiB 文件大小，只按需生成字形；不保证覆盖所有 Unicode、生僻 CJK 扩展字符或 emoji。
 - 暂无连字、复杂文字 shaping、彩色 emoji、独立粗体/斜体字形；undercurl 暂画成直下划线。
 - Windows 使用系统 IME 的基础提交及候选框定位接口；真实中文输入法、跨屏 DPI 和显卡行为需要 Windows 实机验证。Linux 暂未绘制组合输入的预编辑文本。
 - Alt/AltGr、非美式键盘组合、平台快捷键仍需完善。
@@ -93,9 +94,11 @@ xvfb-run -a python3 tools/measure-linux.py --output build/linux/memory.json -- \
 
 Linux 另有 `xvfb-run -a python3 tests/gui_x11.py build/linux/imvim`，通过 X11 原生按键输入文字、执行 `ZZ` 并验证保存结果。
 
+GUI 冒烟测试也会检查中文、常用符号、BMP 与补充平面的 Nerd Font 图标是否存在真实字形。
+
 核心测试覆盖网格滚动、双宽字符、分片 MessagePack、真实 Neovim 输入与中文文件保存、缩放和退出。CI 通过不等于 Windows IME 或硬件图形验收通过。
 
-## 初次实测
+## 首版实测（加入默认回退字体之前）
 
 [Windows CI 构建](https://github.com/jay-waves/imvim/actions/runs/43730641469)（2026-11-15，Windows Server 2022 runner，1000×700 窗口，12 秒 `--clean` 测试，默认 Consolas，未加载中文回退字体）：
 

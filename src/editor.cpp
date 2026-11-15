@@ -33,12 +33,31 @@ Editor::Editor(Session& session, Platform& platform, const std::string& path, co
         font_ = io.Fonts->AddFontFromFileTTF(chosen.c_str(), size);
     } else font_ = io.Fonts->AddFontDefault();
     if (!font_) throw std::runtime_error("Could not load font");
-    if (!fallback.empty()) {
-        if (!std::filesystem::exists(std::filesystem::path(std::u8string(fallback.begin(), fallback.end())))) throw std::runtime_error("Fallback font not found: " + fallback);
+    auto merge = [&](const std::filesystem::path& file, bool icons = false) {
+        if (!std::filesystem::exists(file))
+            throw std::runtime_error("Missing fallback font. Keep the fonts directory beside imvim: " + file.string());
+        auto bytes = file.u8string(); std::string filename(bytes.begin(), bytes.end());
         ImFontConfig config; config.MergeMode = true;
-        if (!io.Fonts->AddFontFromFileTTF(fallback.c_str(), size, &config)) throw std::runtime_error("Could not load fallback font");
-    }
+        if (icons) {
+            // Symbols Only uses a square em. Fit it to the half-em terminal cell.
+            config.ExtraSizeScale = 0.5f;
+            config.GlyphOffset.y = -size * 0.125f;
+        }
+        if (!io.Fonts->AddFontFromFileTTF(filename.c_str(), size, &config))
+            throw std::runtime_error("Could not load fallback font: " + filename);
+    };
+    // Resolve symbols before CJK: some CJK fonts contain unrelated private-use glyphs.
+    merge(platform_.base_path() / "fonts" / "SymbolsNerdFontMono-Regular.ttf", true);
+    merge(fallback.empty() ? platform_.base_path() / "fonts" / "DroidSansFallbackFull.ttf"
+                           : std::filesystem::path(std::u8string(fallback.begin(), fallback.end())));
     io.FontDefault = font_;
+}
+void Editor::check_glyphs() {
+    auto* baked = font_->GetFontBaked(font_size_ * platform_.scale());
+    for (unsigned codepoint : {0x4du, 0x4e2du, 0x6587u, 0x03bbu, 0x2192u, 0x2713u, 0xf07bu, 0xe0b0u, 0xf02d1u}) {
+        if (!baked->FindGlyphNoFallback(codepoint))
+            throw std::runtime_error("Font coverage check failed for Unicode codepoint " + std::to_string(codepoint));
+    }
 }
 bool Editor::receive() {
     bool changed = false;
@@ -108,17 +127,20 @@ void Editor::draw() {
     auto size = ImGui::GetIO().DisplaySize;
     draw->AddRectFilled({0, 0}, size, color(display_.background));
     for (int row = 0; row < display_.height; ++row) {
-        for (int col = 0; col < display_.width; ++col) {
-            auto h = display_.colors(display_.at(row, col).highlight);
-            ImVec2 p{col * cell_width_, row * cell_height_};
-            draw->AddRectFilled(p, {p.x + cell_width_, p.y + cell_height_}, color(h.background));
+        for (int col = 0; col < display_.width;) {
+            int begin = col;
+            int background = display_.colors(display_.at(row, col).highlight).background;
+            while (++col < display_.width && display_.colors(display_.at(row, col).highlight).background == background) {}
+            draw->AddRectFilled({std::round(begin * cell_width_), row * cell_height_},
+                                {std::round(col * cell_width_), (row + 1) * cell_height_}, color(background));
         }
         for (int col = 0; col < display_.width; ++col) {
             const auto& cell = display_.at(row, col);
             if (cell.text.empty()) continue; // continuation of a double-width glyph
             auto h = display_.colors(cell.highlight);
-            ImVec2 p{col * cell_width_, row * cell_height_};
-            float width = cell_width_ * (col + 1 < display_.width && display_.at(row, col + 1).text.empty() ? 2 : 1);
+            ImVec2 p{std::round(col * cell_width_), row * cell_height_};
+            int span = col + 1 < display_.width && display_.at(row, col + 1).text.empty() ? 2 : 1;
+            float width = std::round((col + span) * cell_width_) - p.x;
             ImVec4 clip{p.x, p.y, p.x + width, p.y + cell_height_};
             draw->AddText(font_, font_size_ * platform_.scale(), p, color(h.foreground), cell.text.c_str(), nullptr, 0, &clip);
             if (h.underline || h.undercurl) draw->AddLine({p.x, p.y + cell_height_ - 2}, {p.x + width, p.y + cell_height_ - 2}, color(h.special));
@@ -127,7 +149,7 @@ void Editor::draw() {
     }
     if (!display_.busy && display_.cursor_row >= 0 && display_.cursor_row < display_.height && display_.cursor_col >= 0 && display_.cursor_col < display_.width) {
         int row = display_.cursor_row, col = display_.cursor_col;
-        ImVec2 p{col * cell_width_, row * cell_height_}, end{p.x + cell_width_, p.y + cell_height_};
+        ImVec2 p{std::round(col * cell_width_), row * cell_height_}, end{std::round((col + 1) * cell_width_), p.y + cell_height_};
         platform_.ime(p.x, p.y, cell_height_);
         float fraction = std::clamp(display_.cursor.percent / 100.0f, 0.05f, 1.0f);
         if (display_.cursor.shape == "vertical") end.x = p.x + std::max(2.0f, cell_width_ * fraction);
@@ -146,8 +168,10 @@ void Editor::frame() {
     ++frames;
     float size = font_size_ * platform_.scale();
     ImGui::PushFont(font_, size);
-    cell_width_ = std::ceil(ImGui::CalcTextSize("M").x);
-    cell_height_ = std::ceil(size * 1.25f);
+    // CalcTextSize rounds its result to whole pixels. That is useful for widgets,
+    // but adds space to every editor cell. Use the actual font advance instead.
+    cell_width_ = ImGui::GetFontBaked()->GetCharAdvance('M');
+    cell_height_ = std::ceil(size * 1.2f);
     auto available = ImGui::GetIO().DisplaySize;
     int columns = std::clamp(static_cast<int>(available.x / cell_width_), 2, 1000);
     int rows = std::clamp(static_cast<int>(available.y / cell_height_), 2, 1000);

@@ -34,7 +34,11 @@ if(IMVIM_GUI)
     target_sources(imvim PRIVATE src/platform_sdl.cpp)
     target_link_libraries(imvim PRIVATE SDL3::SDL3 OpenGL::GL)
   endif()
+  add_custom_command(TARGET imvim POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+      "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts" "$<TARGET_FILE_DIR:imvim>/fonts")
   install(TARGETS imvim RUNTIME DESTINATION .)
+  install(DIRECTORY assets/fonts DESTINATION .)
 endif()
 include(CTest)
 if(BUILD_TESTING)

@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <filesystem>
 #include <string>
 namespace imvim {
 class Platform {
@@ -15,6 +16,7 @@ public:
     virtual void ime(float x, float y, float height) = 0;
     virtual float scale() const = 0;
     virtual std::string renderer() const = 0;
+    virtual std::filesystem::path base_path() const = 0;
     virtual void screenshot(const std::string& path) = 0;
 };
 std::unique_ptr<Platform> make_platform();

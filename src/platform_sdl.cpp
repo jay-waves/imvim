@@ -67,6 +67,10 @@ public:
         SDL_SetTextInputArea(window_, &area, 0);
     }
     float scale() const override { return 1.0f; } // SDL/ImGui use logical coordinates; framebuffer scale handles pixels.
+    std::filesystem::path base_path() const override {
+        std::string path = SDL_GetBasePath();
+        return std::filesystem::path(std::u8string(path.begin(), path.end()));
+    }
     std::string renderer() const override {
         const auto* name = glGetString(GL_RENDERER);
         return name ? reinterpret_cast<const char*>(name) : "OpenGL (unknown renderer)";

@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
         for (int i = 1; i < argc; ++i) arguments.emplace_back(argv[i]);
 #endif
         std::string nvim = "nvim", font, fallback, screenshot, stats;
-        float font_size = 18; int smoke_seconds = 0;
+        float font_size = 16; int smoke_seconds = 0;
         std::vector<std::string> nvim_args{"--embed"};
         bool pass = false;
         for (std::size_t i = 0; i < arguments.size(); ++i) {
@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
             else if (arg == "--screenshot") screenshot = value();
             else if (arg == "--stats") stats = value();
             else if (arg == "--help") {
-                const std::string help = "imvim [--nvim PATH] [--font FILE] [--fallback-font FILE] [--font-size 18]\n"
+                const std::string help = "imvim [--nvim PATH] [--font FILE] [--fallback-font FILE] [--font-size 16]\n"
                     "      [--stats FILE] [--smoke-seconds N] [--screenshot FILE.ppm]\n"
                     "      [--clean] [-- Neovim arguments / files]\n"
                     "Ctrl+Shift+V: paste clipboard. Window close: Neovim save confirmation.\n"
@@ -71,9 +71,10 @@ int main(int argc, char** argv) {
             if (platform->take_close_request()) session.request("nvim_command", std::make_tuple(std::string("confirm qall")));
             if (first || native || changed || queued_input) { platform->begin_frame(); editor.frame(); platform->end_frame(); first = false; }
             if (smoke_seconds && editor.ready() && !smoke_content) {
+                editor.check_glyphs();
                 session.request("nvim_buf_set_lines", std::make_tuple(0, 0, -1, false, std::vector<std::string>{
                     "imvim / Neovim UI protocol + Dear ImGui", "", "A thin native frontend. No terminal emulator.",
-                    "", "int main() {", "    return 0;", "}", "", "Unicode: 中文测试  λ → ✓", "", "Idle rendering sleeps until an event arrives."}));
+                    "", "int main() {", "    return 0;", "}", "", "Unicode: 中文测试  λ → ✓", "Nerd Font: \uf07b \ue0b0 \U000f02d1", "", "Idle rendering sleeps until an event arrives."}));
                 session.request("nvim_command", std::make_tuple(std::string("set number | setfiletype cpp")));
                 smoke_content = true;
             }

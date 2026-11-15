@@ -116,6 +116,13 @@ public:
         ImmSetCandidateWindow(imc, &candidate); ImmReleaseContext(window_, imc);
     }
     float scale() const override { return scale_; }
+    std::filesystem::path base_path() const override {
+        std::wstring path(32768, L'\0');
+        DWORD n = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
+        if (!n || n == path.size()) throw std::runtime_error("Cannot locate executable directory");
+        path.resize(n);
+        return std::filesystem::path(path).parent_path();
+    }
     std::string renderer() const override {
         ComPtr<IDXGIDevice> dxgi; ComPtr<IDXGIAdapter> adapter; DXGI_ADAPTER_DESC desc{};
         if (FAILED(device_.As(&dxgi)) || FAILED(dxgi->GetAdapter(&adapter)) || FAILED(adapter->GetDesc(&desc))) return "Direct3D 11";
