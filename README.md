@@ -90,7 +90,7 @@ imvim --fallback-font /path/to/cjk.ttf      # 可选：覆盖内置中文回退�
 
 这是用于验证功能与内存的原型，不是成熟 GUI：
 
-- 默认使用系统等宽主字体，自动合并随包提供的 Droid 中文回退与 Nerd Font Mono 图标；Windows 另查询系统 Segoe UI Symbol 补齐常用符号。默认字号 16，网格使用实际字形 advance，不逐格向上取整。
+- 默认使用系统等宽主字体，自动合并随包提供的 Droid 中文回退与 Nerd Font Mono 图标；Windows 另查询系统 Segoe UI Symbol 补齐常用符号。默认字号 16，网格使用实际字形 advance，不逐格向上取整；双宽字符按两列英文宽度匹配字体尺寸，并在行内垂直居中。
 - 两份回退字体合计约 6.4 MiB 文件大小，只按需生成字形；不保证覆盖所有 Unicode、生僻 CJK 扩展字符或 emoji。
 - 暂无连字、复杂文字 shaping、彩色 emoji、独立粗体/斜体字形；undercurl 暂画成直下划线。
 - Windows 使用系统 IME 的基础提交及候选框定位接口；真实中文输入法、跨屏 DPI 和显卡行为需要 Windows 实机验证。Linux 暂未绘制组合输入的预编辑文本。

@@ -22,5 +22,6 @@ private:
     int columns_ = 0, rows_ = 0;
     void input();
     void draw();
+    void draw_text(int row, int col, ImU32 foreground);
 };
 }

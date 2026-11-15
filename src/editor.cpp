@@ -1,4 +1,5 @@
 #include "editor.hpp"
+#include <imgui_internal.h>
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
@@ -132,6 +133,35 @@ void Editor::input() {
         for (int n = 0; n < std::min(10, static_cast<int>(std::ceil(std::abs(io.MouseWheel)))); ++n)
             session_.request("nvim_input_mouse", std::make_tuple(std::string("wheel"), std::string(io.MouseWheel > 0 ? "up" : "down"), mods, 0, row, col));
 }
+void Editor::draw_text(int row, int col, ImU32 foreground) {
+    const auto& text = display_.at(row, col).text;
+    if (text.empty()) return;
+    int span = col + 1 < display_.width && display_.at(row, col + 1).text.empty() ? 2 : 1;
+    ImVec2 origin{std::round(col * cell_width_), row * cell_height_};
+    float width = std::round((col + span) * cell_width_) - origin.x;
+    ImVec4 clip{origin.x, origin.y, origin.x + width, origin.y + cell_height_};
+    float size = font_size_ * platform_.scale();
+    if (span == 2) {
+        // Fallback fonts have different em metrics. Match wide glyphs to two
+        // Latin advances instead of assuming equal pixel sizes look equal.
+        unsigned codepoint = 0;
+        ImTextCharFromUtf8(&codepoint, text.c_str(), text.c_str() + text.size());
+        auto* glyph = font_->GetFontBaked(size)->FindGlyph(codepoint);
+        if (glyph && glyph->AdvanceX > 0) {
+            float target = 2 * font_->GetFontBaked(size)->GetCharAdvance('M');
+            float factor = std::clamp(target / glyph->AdvanceX, 0.75f, 1.5f);
+            float ink_height = glyph->Y1 - glyph->Y0;
+            if (ink_height > 0) factor = std::min(factor, (cell_height_ - 1) / ink_height);
+            size *= factor;
+            auto* adjusted = font_->GetFontBaked(size)->FindGlyph(codepoint);
+            if (adjusted) {
+                origin.x += (width - adjusted->AdvanceX) * 0.5f;
+                origin.y += std::round((cell_height_ - (adjusted->Y1 - adjusted->Y0)) * 0.5f - adjusted->Y0);
+            }
+        }
+    }
+    ImGui::GetBackgroundDrawList()->AddText(font_, size, origin, foreground, text.c_str(), nullptr, 0, &clip);
+}
 void Editor::draw() {
     auto* draw = ImGui::GetBackgroundDrawList();
     auto size = ImGui::GetIO().DisplaySize;
@@ -151,15 +181,15 @@ void Editor::draw() {
             ImVec2 p{std::round(col * cell_width_), row * cell_height_};
             int span = col + 1 < display_.width && display_.at(row, col + 1).text.empty() ? 2 : 1;
             float width = std::round((col + span) * cell_width_) - p.x;
-            ImVec4 clip{p.x, p.y, p.x + width, p.y + cell_height_};
-            draw->AddText(font_, font_size_ * platform_.scale(), p, color(h.foreground), cell.text.c_str(), nullptr, 0, &clip);
+            draw_text(row, col, color(h.foreground));
             if (h.underline || h.undercurl) draw->AddLine({p.x, p.y + cell_height_ - 2}, {p.x + width, p.y + cell_height_ - 2}, color(h.special));
             if (h.strike) draw->AddLine({p.x, p.y + cell_height_ / 2}, {p.x + width, p.y + cell_height_ / 2}, color(h.foreground));
         }
     }
     if (!display_.busy && display_.cursor_row >= 0 && display_.cursor_row < display_.height && display_.cursor_col >= 0 && display_.cursor_col < display_.width) {
         int row = display_.cursor_row, col = display_.cursor_col;
-        ImVec2 p{std::round(col * cell_width_), row * cell_height_}, end{std::round((col + 1) * cell_width_), p.y + cell_height_};
+        int span = col + 1 < display_.width && display_.at(row,col + 1).text.empty() ? 2 : 1;
+        ImVec2 p{std::round(col * cell_width_), row * cell_height_}, end{std::round((col + span) * cell_width_), p.y + cell_height_};
         platform_.ime(p.x, p.y, cell_height_);
         float fraction = std::clamp(display_.cursor.percent / 100.0f, 0.05f, 1.0f);
         if (display_.cursor.shape == "vertical") end.x = p.x + std::max(2.0f, cell_width_ * fraction);
@@ -169,8 +199,7 @@ void Editor::draw() {
         auto fg = display_.cursor.highlight ? h.foreground : display_.background;
         draw->AddRectFilled(p, end, color(bg));
         if (display_.cursor.shape == "block") {
-            ImVec4 clip{p.x,p.y,end.x,end.y};
-            draw->AddText(font_, font_size_ * platform_.scale(), p, color(fg), display_.at(row,col).text.c_str(), nullptr, 0, &clip);
+            draw_text(row, col, color(fg));
         }
     }
 }
