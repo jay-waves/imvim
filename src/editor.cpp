@@ -24,8 +24,8 @@ std::string default_font() {
     return {};
 }
 }
-Editor::Editor(Session& session, Platform& platform, const std::string& path, const std::string& fallback, float size)
-    : session_(session), platform_(platform), font_size_(size) {
+Editor::Editor(Session& session, Platform& platform, const std::string& path, const std::string& fallback, float size, float line_spacing, float letter_spacing)
+    : session_(session), platform_(platform), font_size_(size), line_spacing_(line_spacing), letter_spacing_(letter_spacing) {
     auto& io = ImGui::GetIO(); io.IniFilename = nullptr; io.LogFilename = nullptr;
     auto chosen = path.empty() ? default_font() : path;
     if (!chosen.empty()) {
@@ -180,8 +180,8 @@ void Editor::frame() {
     ImGui::PushFont(font_, size);
     // CalcTextSize rounds its result to whole pixels. That is useful for widgets,
     // but adds space to every editor cell. Use the actual font advance instead.
-    cell_width_ = ImGui::GetFontBaked()->GetCharAdvance('M');
-    cell_height_ = std::ceil(size * 1.2f);
+    cell_width_ = std::max(1.0f, ImGui::GetFontBaked()->GetCharAdvance('M') + letter_spacing_ * platform_.scale());
+    cell_height_ = std::max(size, std::ceil(size * 1.2f + line_spacing_ * platform_.scale()));
     auto available = ImGui::GetIO().DisplaySize;
     int columns = std::clamp(static_cast<int>(available.x / cell_width_), 2, 1000);
     int rows = std::clamp(static_cast<int>(available.y / cell_height_), 2, 1000);

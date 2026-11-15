@@ -1,4 +1,5 @@
 #include "grid.hpp"
+#include "config.hpp"
 #include "session.hpp"
 #include <chrono>
 #include <filesystem>
@@ -12,7 +13,26 @@ template<class T> msgpack::object_handle object(const T& value) {
     msgpack::sbuffer buffer; msgpack::pack(buffer, value); return msgpack::unpack(buffer.data(), buffer.size());
 }
 template<class T> bool event(imvim::Grid& grid, const T& value) { auto o = object(value); return grid.event(o.get()); }
+void config_test() {
+    auto directory = std::filesystem::temp_directory_path() / ("imvim-config-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(directory);
+    struct Cleanup { std::filesystem::path p; ~Cleanup() { std::error_code ec; std::filesystem::remove_all(p, ec); } } cleanup{directory};
+    auto path = directory / "config.json";
+    require(imvim::load_config(path).font_size == 16, "Missing config uses defaults");
+    auto write = [&](const std::string& contents) { std::ofstream file(path); file << contents; };
+    write(R"({"font":{"file":"fonts/mono.ttf","size":14.5,"line_spacing":2,"letter_spacing":-0.5}})");
+    auto config = imvim::load_config(path);
+    require(config.font_size == 14.5f && config.line_spacing == 2 && config.letter_spacing == -0.5f, "Numeric config settings");
+    auto expected = (directory / "fonts" / "mono.ttf").u8string();
+    require(config.font == std::string(expected.begin(),expected.end()), "Font paths resolve relative to config");
+    for (const auto* invalid : {"{", "[]", R"({"font":{"size":0}})", R"({"font":{"size":"16"}})", R"({"font":{"szie":16}})", R"({"font":{"file":12}})"}) {
+        write(invalid); bool rejected = false;
+        try { imvim::load_config(path); } catch (const std::exception& e) { rejected = std::string(e.what()).find("config.json") != std::string::npos; }
+        require(rejected, "Invalid config includes file path in error");
+    }
+}
 void unit() {
+    config_test();
     imvim::Grid g;
     event(g, std::make_tuple("grid_resize", std::make_tuple(1, 5, 3)));
     event(g, std::make_tuple("grid_line", std::make_tuple(1, 0, 0, std::vector<std::tuple<std::string,int,int>>{{"A",2,2},{"中",3,1},{"",3,1},{"Z",4,1}})));

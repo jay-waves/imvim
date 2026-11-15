@@ -1,4 +1,5 @@
 #include "editor.hpp"
+#include "config.hpp"
 #include <imgui_internal.h>
 #include <chrono>
 #include <iostream>
@@ -24,8 +25,9 @@ int main(int argc, char** argv) {
 #else
         for (int i = 1; i < argc; ++i) arguments.emplace_back(argv[i]);
 #endif
-        std::string nvim = "nvim", font, fallback, screenshot, stats;
-        float font_size = 16; int smoke_seconds = 0;
+        auto config = load_config(default_config_path());
+        std::string nvim = "nvim", font = config.font, fallback = config.fallback_font, screenshot, stats;
+        float font_size = config.font_size; int smoke_seconds = 0;
         std::vector<std::string> nvim_args{"--embed"};
         bool pass = false;
         for (std::size_t i = 0; i < arguments.size(); ++i) {
@@ -59,7 +61,7 @@ int main(int argc, char** argv) {
         if (smoke_seconds) nvim_args = {"--embed", "--clean", "-n"};
         auto platform = make_platform();
         Session session(nvim, nvim_args, [&] { platform->wake(); });
-        Editor editor(session, *platform, font, fallback, font_size);
+        Editor editor(session, *platform, font, fallback, font_size, config.line_spacing, config.letter_spacing);
         bool first = true, smoke_content = false;
         auto started = std::chrono::steady_clock::now();
         while (session.alive()) {

@@ -60,6 +60,7 @@ jobs:
           New-Item -ItemType Directory -Force dist/licenses | Out-Null
           Copy-Item build/windows/vcpkg_installed/x64-windows-static/share/imgui/copyright dist/licenses/imgui.txt
           Copy-Item build/windows/vcpkg_installed/x64-windows-static/share/msgpack/copyright dist/licenses/msgpack.txt
+          Copy-Item build/windows/vcpkg_installed/x64-windows-static/share/nlohmann-json/copyright dist/licenses/nlohmann-json.txt
           Compress-Archive dist/* imvim-windows-x64.zip
       - uses: actions/upload-artifact@v4
         with:

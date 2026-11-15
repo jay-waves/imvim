@@ -64,6 +64,28 @@ imvim --fallback-font /path/to/cjk.ttf      # 可选：覆盖内置中文回退�
 - 关闭窗口向 Neovim 发出 `confirm qall`，有修改时在编辑区确认。`:q` / `:qa` 正常退出。
 - Windows 使用 Unicode 命令行，支持含空格和中文的路径。
 
+## 字体配置
+
+读取 `~/.config/imvim/config.json`；Windows 对应 `%USERPROFILE%\.config\imvim\config.json`。文件不存在时使用默认值，不自动写入用户配置。修改后重启生效。
+
+```json
+{
+  "font": {
+    "file": "C:/Windows/Fonts/consola.ttf",
+    "fallback_file": "",
+    "size": 16,
+    "line_spacing": 0,
+    "letter_spacing": 0
+  }
+}
+```
+
+`file` 为空或省略时自动选择系统等宽字体；可直接指定已安装的系统字体文件。`fallback_file` 为空或省略时使用内置中文回退，Nerd Font 与 Windows 系统符号回退继续保留。当前支持字体文件路径，尚不支持字体族名。
+
+字号范围 8–72；行距和字距为默认网格尺寸上额外增加的逻辑像素，范围分别为 -2–32 与 -2–16。Windows 会按 DPI 缩放。负字距可能裁切字形，建议先使用 0。
+
+路径支持 `~/`，相对路径以配置文件目录为基准。JSON 中 Windows 路径建议使用 `/`。所有字段可省略；错误类型、拼写错误与非法 JSON 会报告配置路径和原因。命令行 `--font`、`--fallback-font`、`--font-size` 覆盖相应配置。
+
 ## 当前边界
 
 这是用于验证功能与内存的原型，不是成熟 GUI：
