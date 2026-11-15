@@ -50,6 +50,16 @@ Editor::Editor(Session& session, Platform& platform, const std::string& path, co
     merge(platform_.base_path() / "fonts" / "SymbolsNerdFontMono-Regular.ttf", true);
     merge(fallback.empty() ? platform_.base_path() / "fonts" / "DroidSansFallbackFull.ttf"
                            : std::filesystem::path(std::u8string(fallback.begin(), fallback.end())));
+#ifdef _WIN32
+    // Consolas and Droid do not cover all mathematical / UI symbols.
+    // Use Windows' installed symbol font for the remaining glyphs.
+    wchar_t windows_dir[MAX_PATH];
+    UINT length = GetWindowsDirectoryW(windows_dir, MAX_PATH);
+    if (length && length < MAX_PATH) {
+        auto symbols = std::filesystem::path(windows_dir) / "Fonts" / "seguisym.ttf";
+        if (std::filesystem::exists(symbols)) merge(symbols);
+    }
+#endif
     io.FontDefault = font_;
 }
 void Editor::check_glyphs() {
