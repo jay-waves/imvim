@@ -1,0 +1,49 @@
+{
+  "name": "imvim",
+  "version-string": "0.1.0",
+  "builtin-baseline": "8f363bdc11359ede4bc51e5eb32a2617538049c8",
+  "dependencies": [
+    "msgpack"
+  ],
+  "default-features": [
+    "gui"
+  ],
+  "features": {
+    "gui": {
+      "description": "Native Windows or SDL3 Linux graphical frontend",
+      "dependencies": [
+        {
+          "name": "imgui",
+          "features": [
+            "wchar32"
+          ]
+        },
+        {
+          "name": "imgui",
+          "features": [
+            "win32-binding",
+            "dx11-binding"
+          ],
+          "platform": "windows"
+        },
+        {
+          "name": "imgui",
+          "features": [
+            "sdl3-binding",
+            "opengl3-binding"
+          ],
+          "platform": "linux"
+        },
+        {
+          "name": "sdl3",
+          "platform": "linux"
+        },
+        {
+          "name": "dbus",
+          "default-features": false,
+          "platform": "linux"
+        }
+      ]
+    }
+  }
+}

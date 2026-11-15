@@ -1,0 +1,98 @@
+name: Build and test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/.vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Fetch pinned vcpkg
+        shell: pwsh
+        run: |
+          git init $env:VCPKG_ROOT
+          git -C $env:VCPKG_ROOT remote add origin https://github.com/microsoft/vcpkg.git
+          git -C $env:VCPKG_ROOT fetch --depth 1 origin 8f363bdc11359ede4bc51e5eb32a2617538049c8
+          git -C $env:VCPKG_ROOT checkout --detach FETCH_HEAD
+          & "$env:VCPKG_ROOT/bootstrap-vcpkg.bat" -disableMetrics
+      - uses: actions/cache@v4
+        with:
+          path: .vcpkg-cache
+          key: windows-msvc-${{ hashFiles('vcpkg.json') }}
+      - name: Install Neovim for integration test
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://github.com/neovim/neovim/releases/download/v0.11.5/nvim-win64.zip -OutFile "$env:RUNNER_TEMP/nvim.zip"
+          Expand-Archive "$env:RUNNER_TEMP/nvim.zip" "$env:RUNNER_TEMP/nvim"
+          "$env:RUNNER_TEMP/nvim/nvim-win64/bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+      - run: cmake --preset windows
+      - run: cmake --build --preset windows
+      - run: ctest --preset windows
+      - name: Windows GUI smoke and memory sample
+        timeout-minutes: 2
+        shell: pwsh
+        run: ./tools/measure-windows.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-smoke
+          path: |
+            build/windows/memory.json
+            build/windows/idle.json
+      - name: Package
+        shell: pwsh
+        run: |
+          cmake --install build/windows --prefix dist
+          Copy-Item README.md dist/
+          New-Item -ItemType Directory -Force dist/licenses | Out-Null
+          Copy-Item build/windows/vcpkg_installed/x64-windows-static/share/imgui/copyright dist/licenses/imgui.txt
+          Copy-Item build/windows/vcpkg_installed/x64-windows-static/share/msgpack/copyright dist/licenses/msgpack.txt
+          Compress-Archive dist/* imvim-windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: imvim-windows-x64
+          path: imvim-windows-x64.zip
+  linux:
+    runs-on: ubuntu-24.04
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/.vcpkg
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install platform development dependencies
+        run: sudo apt-get update && sudo apt-get install -y ninja-build pkg-config autoconf autoconf-archive automake libtool libltdl-dev libgl1-mesa-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev libdecor-0-dev libibus-1.0-dev xvfb
+      - name: Fetch pinned vcpkg
+        run: |
+          git init "$VCPKG_ROOT"
+          git -C "$VCPKG_ROOT" remote add origin https://github.com/microsoft/vcpkg.git
+          git -C "$VCPKG_ROOT" fetch --depth 1 origin 8f363bdc11359ede4bc51e5eb32a2617538049c8
+          git -C "$VCPKG_ROOT" checkout --detach FETCH_HEAD
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+      - uses: actions/cache@v4
+        with:
+          path: .vcpkg-cache
+          key: linux-${{ hashFiles('vcpkg.json') }}
+      - name: Install Neovim for integration test
+        run: |
+          curl -fL https://github.com/neovim/neovim/releases/download/v0.11.5/nvim-linux-x86_64.tar.gz -o "$RUNNER_TEMP/nvim.tar.gz"
+          tar -xzf "$RUNNER_TEMP/nvim.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/nvim-linux-x86_64/bin" >> "$GITHUB_PATH"
+      - run: cmake --preset linux
+      - run: cmake --build --preset linux
+      - run: ctest --preset linux
+      - name: GUI smoke test
+        run: xvfb-run -a build/linux/imvim --smoke-seconds 3 --stats build/linux/smoke.json --screenshot build/linux/smoke.ppm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-smoke
+          path: |
+            build/linux/smoke.json
+            build/linux/smoke.ppm

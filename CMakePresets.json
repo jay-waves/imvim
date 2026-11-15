@@ -1,0 +1,27 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "base", "hidden": true, "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {"name": "linux", "inherits": "base", "cacheVariables": {"VCPKG_TARGET_TRIPLET": "x64-linux"}},
+    {"name": "windows", "inherits": "base", "cacheVariables": {"VCPKG_TARGET_TRIPLET": "x64-windows-static", "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>"}},
+    {"name": "core", "inherits": "base", "cacheVariables": {"IMVIM_GUI": "OFF", "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON"}}
+  ],
+  "buildPresets": [
+    {"name": "linux", "configurePreset": "linux"},
+    {"name": "windows", "configurePreset": "windows"},
+    {"name": "core", "configurePreset": "core"}
+  ],
+  "testPresets": [
+    {"name": "linux", "configurePreset": "linux", "output": {"outputOnFailure": true}},
+    {"name": "windows", "configurePreset": "windows", "output": {"outputOnFailure": true}},
+    {"name": "core", "configurePreset": "core", "output": {"outputOnFailure": true}}
+  ]
+}

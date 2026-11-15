@@ -1,0 +1,11 @@
+/build/
+/vcpkg_installed/
+/CMakeUserPresets.json
+/compile_commands.json
+*.log
+imgui.ini
+__pycache__/
+/.vcpkg/
+/.vcpkg-cache/
+/dist/
+/imvim-windows-x64.zip
