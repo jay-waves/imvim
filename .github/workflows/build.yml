@@ -18,6 +18,9 @@ jobs:
       - name: Fetch pinned vcpkg
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $env:VCPKG_ROOT = Join-Path $env:GITHUB_WORKSPACE ".vcpkg"
+          "VCPKG_ROOT=$env:VCPKG_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           git init $env:VCPKG_ROOT
           git -C $env:VCPKG_ROOT remote add origin https://github.com/microsoft/vcpkg.git
           git -C $env:VCPKG_ROOT fetch --depth 1 origin 8f363bdc11359ede4bc51e5eb32a2617538049c8
