@@ -74,7 +74,11 @@ public:
     void screenshot(const std::string& path) override {
         int w, h; SDL_GetWindowSizeInPixels(window_, &w, &h);
         std::vector<unsigned char> pixels(static_cast<std::size_t>(w) * h * 3);
-        glPixelStorei(GL_PACK_ALIGNMENT, 1); glReadBuffer(GL_FRONT); glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+        // Some X11 drivers discard the front buffer after Present. Re-render
+        // the last completed draw list to the back buffer before readback.
+        glViewport(0, 0, w, h); glClearColor(0.12f, 0.13f, 0.16f, 1); glClear(GL_COLOR_BUFFER_BIT);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        glPixelStorei(GL_PACK_ALIGNMENT, 1); glReadBuffer(GL_BACK); glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
         std::ofstream out(path, std::ios::binary); out << "P6\n" << w << ' ' << h << "\n255\n";
         for (int y = h - 1; y >= 0; --y) out.write(reinterpret_cast<char*>(pixels.data() + y * w * 3), w * 3);
         if (!out) throw std::runtime_error("Cannot write screenshot");
